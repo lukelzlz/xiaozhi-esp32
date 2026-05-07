@@ -5,6 +5,7 @@
 #include "system_info.h"
 #include "settings.h"
 #include "assets/lang_config.h"
+#include "station_web_server.h"
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -111,6 +112,11 @@ void WifiBoard::StartNetwork() {
         EnterWifiConfigMode();
         return;
     }
+
+    // Start WebUI in station mode
+    auto& web_server = StationWebServer::GetInstance();
+    web_server.Start();
+    ESP_LOGI(TAG, "Station mode WebUI available at %s", web_server.GetUrl().c_str());
 }
 
 NetworkInterface* WifiBoard::GetNetwork() {

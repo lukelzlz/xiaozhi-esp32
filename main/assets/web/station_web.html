@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>XiaoZhi</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#f0f2f5;color:#333;max-width:480px;margin:0 auto;padding:16px}
+.card{background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+h1{font-size:20px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+h2{font-size:16px;color:#666;margin-bottom:12px}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#52c41a;display:inline-block}
+.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0}
+.row:last-child{border:none}
+.label{color:#888;font-size:14px}
+.value{font-weight:500;font-size:14px;word-break:break-all;max-width:60%;text-align:right}
+input[type=text],input[type=number]{width:100%;padding:10px 12px;border:1px solid #d9d9d9;border-radius:8px;font-size:14px;margin-top:4px;outline:none;transition:border .2s}
+input:focus{border-color:#1890ff}
+.btn{display:block;width:100%;padding:12px;border:none;border-radius:8px;font-size:15px;font-weight:500;cursor:pointer;transition:opacity .2s;margin-top:12px}
+.btn:hover{opacity:.85}
+.btn-primary{background:#1890ff;color:#fff}
+.btn-danger{background:#ff4d4f;color:#fff}
+.btn-warning{background:#faad14;color:#fff}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.stat-box{background:#fafafa;border-radius:8px;padding:12px;text-align:center}
+.stat-val{font-size:24px;font-weight:700;color:#1890ff}
+.stat-label{font-size:12px;color:#999;margin-top:2px}
+#toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#52c41a;color:#fff;padding:10px 24px;border-radius:8px;font-size:14px;display:none;z-index:99}
+.footer{text-align:center;color:#bbb;font-size:12px;margin-top:16px}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<div class="card">
+<h1><span class="status-dot"></span> XiaoZhi</h1>
+<h2 id="board-type">loading...</h2>
+<div class="stats">
+  <div class="stat-box"><div class="stat-val" id="s-volume">--</div><div class="stat-label">Volume</div></div>
+  <div class="stat-box"><div class="stat-val" id="s-rssi">--</div><div class="stat-label">RSSI</div></div>
+</div>
+</div>
+
+<div class="card">
+<h2>Device Info</h2>
+<div class="row"><span class="label">Firmware</span><span class="value" id="i-version">--</span></div>
+<div class="row"><span class="label">IDF</span><span class="value" id="i-idf">--</span></div>
+<div class="row"><span class="label">Board</span><span class="value" id="i-board">--</span></div>
+<div class="row"><span class="label">MAC</span><span class="value" id="i-mac">--</span></div>
+<div class="row"><span class="label">SSID</span><span class="value" id="i-ssid">--</span></div>
+<div class="row"><span class="label">UUID</span><span class="value" id="i-uuid">--</span></div>
+</div>
+
+<div class="card">
+<h2>Settings</h2>
+<label style="font-size:14px;color:#888">OTA URL</label>
+<input type="text" id="c-ota_url" placeholder="https://api.tenclass.net/xiaozhi/ota/">
+<label style="font-size:14px;color:#888;margin-top:12px;display:block">Volume (0-100)</label>
+<input type="number" id="c-volume" min="0" max="100">
+<button class="btn btn-primary" onclick="saveSettings()">Save</button>
+</div>
+
+<div class="card">
+<h2>Actions</h2>
+<button class="btn btn-warning" onclick="doReboot()">Reboot</button>
+<button class="btn btn-danger" style="margin-top:8px" onclick="doWifiReset()">Reset WiFi Config</button>
+</div>
+
+<div class="footer">XiaoZhi ESP32 &bull; Station Mode WebUI</div>
+
+<script>
+function $(id){return document.getElementById(id)}
+function toast(msg,ok){
+  var t=$('toast');t.textContent=msg;t.style.display='block';
+  t.style.background=ok?'#52c41a':'#ff4d4f';
+  setTimeout(function(){t.style.display='none'},2000);
+}
+function loadInfo(){
+  fetch('/api/info').then(r=>r.json()).then(d=>{
+    $('i-version').textContent=d.version;
+    $('i-idf').textContent=d.idf_version;
+    $('i-board').textContent=d.board_type;
+    $('i-mac').textContent=d.mac_address;
+    $('i-ssid').textContent=d.ssid||'--';
+    $('i-uuid').textContent=d.uuid;
+    $('board-type').textContent=d.board_type+' @ '+d.version;
+    $('s-rssi').textContent=d.rssi||'--';
+    $('c-ota_url').value=d.ota_url||'';
+  }).catch(()=>{});
+}
+function loadStatus(){
+  fetch('/api/status').then(r=>r.json()).then(d=>{
+    if(d.audio_speaker)$('s-volume').textContent=d.audio_speaker.volume;
+  }).catch(()=>{});
+}
+function loadSettings(){
+  fetch('/api/settings').then(r=>r.json()).then(d=>{
+    if(d.ota_url!==undefined)$('c-ota_url').value=d.ota_url;
+    if(d.volume!==undefined)$('c-volume').value=d.volume;
+  }).catch(()=>{});
+}
+function saveSettings(){
+  var body=JSON.stringify({
+    ota_url:$('c-ota_url').value,
+    volume:parseInt($('c-volume').value)
+  });
+  fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:body})
+  .then(r=>r.json()).then(d=>{
+    toast('Saved!',d.success);
+    setTimeout(loadStatus,500);
+  }).catch(()=>toast('Failed',false));
+}
+function doReboot(){
+  if(!confirm('Reboot the device?'))return;
+  fetch('/api/reboot',{method:'POST'}).then(()=>toast('Rebooting...',true));
+}
+function doWifiReset(){
+  if(!confirm('Reset WiFi? Device will enter config mode.'))return;
+  fetch('/api/wifi-reset',{method:'POST'}).then(()=>toast('Resetting...',true));
+}
+loadInfo();loadStatus();loadSettings();
+</script>
+</body>
+</html>
