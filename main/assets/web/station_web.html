@@ -70,7 +70,10 @@ input:focus{border-color:#1890ff}
 <div class="footer">XiaoZhi ESP32 &bull; Station Mode WebUI</div>
 
 <script>
+var AUTH_TOKEN='';
 function $(id){return document.getElementById(id)}
+function authHeaders(){return AUTH_TOKEN?{'Content-Type':'application/json','X-Auth-Token':AUTH_TOKEN}:{'Content-Type':'application/json'}}
+function authQuery(url){return AUTH_TOKEN?url+'?token='+encodeURIComponent(AUTH_TOKEN):url}
 function toast(msg,ok){
   var t=$('toast');t.textContent=msg;t.style.display='block';
   t.style.background=ok?'#52c41a':'#ff4d4f';
@@ -78,6 +81,7 @@ function toast(msg,ok){
 }
 function loadInfo(){
   fetch('/api/info').then(r=>r.json()).then(d=>{
+    if(d.auth_token)AUTH_TOKEN=d.auth_token;
     $('i-version').textContent=d.version;
     $('i-idf').textContent=d.idf_version;
     $('i-board').textContent=d.board_type;
@@ -87,6 +91,7 @@ function loadInfo(){
     $('board-type').textContent=d.board_type+' @ '+d.version;
     $('s-rssi').textContent=d.rssi||'--';
     $('c-ota_url').value=d.ota_url||'';
+    loadSettings();
   }).catch(()=>{});
 }
 function loadStatus(){
@@ -95,7 +100,11 @@ function loadStatus(){
   }).catch(()=>{});
 }
 function loadSettings(){
-  fetch('/api/settings').then(r=>r.json()).then(d=>{
+  fetch(authQuery('/api/settings'),{headers:authHeaders()}).then(r=>{
+    if(r.status===401){toast('Auth required',false);return null}
+    return r.json();
+  }).then(d=>{
+    if(!d)return;
     if(d.ota_url!==undefined)$('c-ota_url').value=d.ota_url;
     if(d.volume!==undefined)$('c-volume').value=d.volume;
   }).catch(()=>{});
@@ -105,21 +114,25 @@ function saveSettings(){
     ota_url:$('c-ota_url').value,
     volume:parseInt($('c-volume').value)
   });
-  fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:body})
-  .then(r=>r.json()).then(d=>{
+  fetch(authQuery('/api/settings'),{method:'POST',headers:authHeaders(),body:body})
+  .then(r=>{if(r.status===401){toast('Auth failed',false);return null}return r.json()})
+  .then(d=>{
+    if(!d)return;
     toast('Saved!',d.success);
     setTimeout(loadStatus,500);
   }).catch(()=>toast('Failed',false));
 }
 function doReboot(){
   if(!confirm('Reboot the device?'))return;
-  fetch('/api/reboot',{method:'POST'}).then(()=>toast('Rebooting...',true));
+  fetch(authQuery('/api/reboot'),{method:'POST',headers:authHeaders()})
+  .then(()=>toast('Rebooting...',true));
 }
 function doWifiReset(){
   if(!confirm('Reset WiFi? Device will enter config mode.'))return;
-  fetch('/api/wifi-reset',{method:'POST'}).then(()=>toast('Resetting...',true));
+  fetch(authQuery('/api/wifi-reset'),{method:'POST',headers:authHeaders()})
+  .then(()=>toast('Resetting...',true));
 }
-loadInfo();loadStatus();loadSettings();
+loadInfo();loadStatus();
 </script>
 </body>
 </html>

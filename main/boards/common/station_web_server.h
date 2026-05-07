@@ -2,7 +2,8 @@
 #define STATION_WEB_SERVER_H
 
 #include <string>
-#include <functional>
+#include <atomic>
+#include <esp_http_server.h>
 
 class StationWebServer {
 public:
@@ -15,8 +16,8 @@ public:
 
 private:
     StationWebServer() = default;
-    void* server_ = nullptr;
-    bool running_ = false;
+    httpd_handle_t server_ = nullptr;
+    std::atomic<bool> running_{false};
 };
 
 #endif
