@@ -67,7 +67,7 @@ input:focus{border-color:#1890ff}
 <button class="btn btn-danger" style="margin-top:8px" onclick="doWifiReset()">Reset WiFi Config</button>
 </div>
 
-<div class="footer">XiaoZhi ESP32 &bull; Station Mode WebUI</div>
+<div class="footer" id="footer-text">XiaoZhi ESP32 &bull; Station Mode WebUI</div>
 
 <script>
 var AUTH_TOKEN='';
@@ -91,6 +91,7 @@ function loadInfo(){
     $('board-type').textContent=d.board_type+' @ '+d.version;
     $('s-rssi').textContent=d.rssi||'--';
     $('c-ota_url').value=d.ota_url||'';
+    $('footer-text').textContent=d.mac_address+' &bull; '+location.host;
     loadSettings();
   }).catch(()=>{});
 }
