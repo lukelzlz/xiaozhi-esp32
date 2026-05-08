@@ -34,6 +34,7 @@ private:
     PowerManager* power_manager_;
     esp_lcd_panel_io_handle_t panel_io_ = nullptr;
     esp_lcd_panel_handle_t panel_ = nullptr;
+    bool vol_up_held_ = false;
 
     void InitializePowerManager() {
         power_manager_ = new PowerManager(GPIO_NUM_38);
@@ -97,15 +98,8 @@ private:
             app.ToggleChatState();
         });
 
-        boot_button_.OnDoubleClick([this]() {
-            power_save_timer_->WakeUp();
-            auto& game = JumpGame::GetInstance();
-            if (!game.IsRunning()) {
-                game.Start();
-            }
-        });
-
         volume_up_button_.OnClick([this]() {
+            if (vol_up_held_) return;
             power_save_timer_->WakeUp();
             auto& game = JumpGame::GetInstance();
             if (game.IsRunning()) return;
@@ -119,11 +113,13 @@ private:
         });
 
         volume_up_button_.OnPressDown([this]() {
+            vol_up_held_ = true;
             auto& game = JumpGame::GetInstance();
             if (game.IsRunning()) game.Press();
         });
 
         volume_up_button_.OnPressUp([this]() {
+            vol_up_held_ = false;
             auto& game = JumpGame::GetInstance();
             if (game.IsRunning()) game.Release();
         });
@@ -149,6 +145,13 @@ private:
             }
             codec->SetOutputVolume(volume);
             GetDisplay()->ShowNotification(Lang::Strings::VOLUME + std::to_string(volume));
+        });
+
+        volume_down_button_.OnPressDown([this]() {
+            if (vol_up_held_ && !JumpGame::GetInstance().IsRunning()) {
+                JumpGame::GetInstance().Start();
+                return;
+            }
         });
 
         volume_down_button_.OnLongPress([this]() {
