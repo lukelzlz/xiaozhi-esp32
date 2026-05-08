@@ -9,6 +9,7 @@
 #include "led/single_led.h"
 #include "assets/lang_config.h"
 #include "power_manager.h"
+#include "display/jump_game.h"
 
 #include <esp_log.h>
 #include <esp_lcd_panel_vendor.h>
@@ -84,6 +85,11 @@ private:
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
             power_save_timer_->WakeUp();
+            auto& game = JumpGame::GetInstance();
+            if (game.IsRunning()) {
+                game.Stop();
+                return;
+            }
             auto& app = Application::GetInstance();
             if (app.GetDeviceState() == kDeviceStateStarting && !WifiStation::GetInstance().IsConnected()) {
                 ResetWifiConfiguration();
@@ -91,8 +97,18 @@ private:
             app.ToggleChatState();
         });
 
+        boot_button_.OnDoubleClick([this]() {
+            power_save_timer_->WakeUp();
+            auto& game = JumpGame::GetInstance();
+            if (!game.IsRunning()) {
+                game.Start();
+            }
+        });
+
         volume_up_button_.OnClick([this]() {
             power_save_timer_->WakeUp();
+            auto& game = JumpGame::GetInstance();
+            if (game.IsRunning()) return;
             auto codec = GetAudioCodec();
             auto volume = codec->output_volume() + 10;
             if (volume > 100) {
@@ -102,14 +118,30 @@ private:
             GetDisplay()->ShowNotification(Lang::Strings::VOLUME + std::to_string(volume));
         });
 
+        volume_up_button_.OnPressDown([this]() {
+            auto& game = JumpGame::GetInstance();
+            if (game.IsRunning()) game.Press();
+        });
+
+        volume_up_button_.OnPressUp([this]() {
+            auto& game = JumpGame::GetInstance();
+            if (game.IsRunning()) game.Release();
+        });
+
         volume_up_button_.OnLongPress([this]() {
             power_save_timer_->WakeUp();
+            if (JumpGame::GetInstance().IsRunning()) return;
             GetAudioCodec()->SetOutputVolume(100);
             GetDisplay()->ShowNotification(Lang::Strings::MAX_VOLUME);
         });
 
         volume_down_button_.OnClick([this]() {
             power_save_timer_->WakeUp();
+            auto& game = JumpGame::GetInstance();
+            if (game.IsRunning()) {
+                game.Press();
+                return;
+            }
             auto codec = GetAudioCodec();
             auto volume = codec->output_volume() - 10;
             if (volume < 0) {
@@ -121,6 +153,7 @@ private:
 
         volume_down_button_.OnLongPress([this]() {
             power_save_timer_->WakeUp();
+            if (JumpGame::GetInstance().IsRunning()) return;
             GetAudioCodec()->SetOutputVolume(0);
             GetDisplay()->ShowNotification(Lang::Strings::MUTED);
         });
